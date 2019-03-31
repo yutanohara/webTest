@@ -1,5 +1,6 @@
 class UsersController < ApplicationController
   before_action :basic_auth, except: :signup
+  protect_from_forgery
 
   CREATE_FAILED = 'Account creation failed'.freeze
   def signup
@@ -31,7 +32,7 @@ class UsersController < ApplicationController
   end
 
   def show
-    user = User.find_by(id: params[:user_id])
+    user = User.find_by(user_id: params[:id])
     json = {
       user_id: user[:user_id],
       nickname: user[:nickname]
@@ -50,25 +51,25 @@ class UsersController < ApplicationController
         cause: 'required nickname or comment'
       }
     end
-    if params[:user_id] && params[:password]
+    if params[:id] && params[:password]
       return render json: {
         message: 'User updation failed',
         cause: 'not updatable user_id and password'
       }
     end
-    if params[:user_id] != @user_id
+    if params[:id] != @user_id
       return render json: {
         message: 'No Permission for Update'
       }
     end
     can_update = true
-    user = User.find_by(id: params[:user_id])
+    user = User.find_by(id: params[:id])
     if !params[:nickname]
       user[:nickname] = user[:user_id]
-    elsif params[:nickname] > 30
+    elsif params[:nickname].length > 30
       can_update = false
     end
-    if params[:comment] > 100
+    if params[:comment].length > 100
       can_update = false
     end
     unless can_update
@@ -101,13 +102,13 @@ class UsersController < ApplicationController
   private
 
   def validate_user_id(user_id)
-    return false if user_id < 6 || user_id > 20 || (/\A[a-zA-Z0-9]+\z/ =~ user_id).nil?
+    return false if user_id.length < 6 || user_id.length > 20 || (/\A[a-zA-Z0-9]+\z/ =~ user_id).nil?
     true
   end
 
   def validate_password(password)
     # 後で修正
-    return false if password < 8 || password > 20 || (/\A[a-zA-Z0-9]+\z/ =~ password).nil?
+    return false if password.length < 8 || password.length > 20 || (/\A[a-zA-Z0-9]+\z/ =~ password).nil?
     true
   end
 
@@ -122,10 +123,16 @@ class UsersController < ApplicationController
       end
       user = User.find_by(user_id: user_id, password: password)
       unless user
-        render json: {
+        return render json: {
           'message': 'No User found'
         }
       end
+
+      return true
     end
+  end
+
+  def listing_params
+    params.require(:users).permit(:user_id, :password, :nickname, :comment)
   end
 end
